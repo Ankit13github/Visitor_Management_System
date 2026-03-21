@@ -1,155 +1,135 @@
-from flask import Flask, request, render_template
+import streamlit as st
 import requests
 import openpyxl
 import os
 
-app = Flask(__name__)
-
-# UltraMsg API credentials
+# ---------------- API CONFIG ----------------
 INSTANCE_KEY = "instance143653"
-TOKEN = "8i34klnikkn43e2t"
+TOKEN = "your_token_here"   # replace later with secrets
 API_URL = f"https://api.ultramsg.com/{INSTANCE_KEY}/messages/chat"
 
 EXCEL_FILE = "Student_Data.xlsx"
 
-# Create Excel file if not exists
+# ---------------- EXCEL SETUP ----------------
 if not os.path.exists(EXCEL_FILE):
-    workbook = openpyxl.Workbook()
-    sheet = workbook.active
+    wb = openpyxl.Workbook()
+    sheet = wb.active
     sheet.title = "Student Data"
     sheet.append(["Student Name", "Phone Number", "Course Name", "Parent Name", "Parent Contact"])
-    workbook.save(EXCEL_FILE)
+    wb.save(EXCEL_FILE)
 
-# Save to Excel
 def save_to_excel(data):
-    workbook = openpyxl.load_workbook(EXCEL_FILE)
-    sheet = workbook.active
+    wb = openpyxl.load_workbook(EXCEL_FILE)
+    sheet = wb.active
     sheet.append(data)
-    workbook.save(EXCEL_FILE)
+    wb.save(EXCEL_FILE)
 
-# Send WhatsApp message
+# ---------------- WHATSAPP FUNCTION ----------------
 def send_whatsapp_message(phone_number, message):
     if not phone_number.startswith("+91"):
         phone_number = "+91" + phone_number.lstrip("0")
+
     payload = {"to": phone_number, "body": message}
+
     try:
         response = requests.post(f"{API_URL}?token={TOKEN}", json=payload)
         return response.json()
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         return {"error": str(e)}
 
-# Home Page
-@app.route("/")
-def home():
-    return '''
-    <html>
-    <head><title>Visitor Management System</title></head>
-    <body style="text-align:center; font-family:Arial; background:#f0f4f8; padding-top:50px;">
-        <h1 style="color:#6a11cb;">Visitor Management System</h1>
-        <a href="/visitor_form" style="padding:15px 25px; margin:10px; background:#6a11cb; color:white; border-radius:8px; text-decoration:none;">Individual Visitor Message</a>
-        <a href="/bulk_message" style="padding:15px 25px; margin:10px; background:#6a11cb; color:white; border-radius:8px; text-decoration:none;">Bulk WhatsApp Sender</a>
-    </body>
-    </html>
-    '''
+# ---------------- UI ----------------
+st.set_page_config(page_title="Visitor Management System", layout="centered")
 
-# Visitor Form Page
-@app.route("/visitor_form")
-def visitor_form():
-    return render_template("index.html")
+st.title("Visitor Management System")
 
-# Handle Individual Form Submission
-@app.route("/send_message", methods=["POST"])
-def send_message():
-    student_name = request.form.get("student_name", "").strip()
-    student_number = request.form.get("student_number", "").strip()
-    course_name = request.form.get("course_name", "").strip()
-    parent_name = request.form.get("parent_name", "").strip()
-    parent_contact = request.form.get("parent_contact", "").strip()
+menu = st.sidebar.radio("Menu", ["Visitor Entry", "Bulk Message"])
 
-    if not all([student_name, student_number, course_name, parent_name, parent_contact]):
-        return "Error: All fields are required."
+# =====================================================
+# 👤 VISITOR ENTRY
+# =====================================================
+if menu == "Visitor Entry":
 
-    save_to_excel([student_name, student_number, course_name, parent_name, parent_contact])
+    st.header("Visitor Registration Form")
 
-    message = f"""
+    student_name = st.text_input("Student Name")
+    student_number = st.text_input("Student Contact Number")
+    course_name = st.text_input("Course Name")
+    parent_name = st.text_input("Parent Name")
+    parent_contact = st.text_input("Parent Contact Number")
+
+    if st.button("Submit"):
+        if not all([student_name, student_number, course_name, parent_name, parent_contact]):
+            st.error("All fields are required")
+        else:
+            save_to_excel([student_name, student_number, course_name, parent_name, parent_contact])
+
+            message = f"""
 Hello {student_name},
 
 Welcome to Vikrant Group Of Institutions, Indore.
 
-Thank you very much for visiting the campus.
+Thank you for visiting our campus.
 
-Vikrant Group has been into existence since more then 20 years now, with more than 10,000/- Alumni working in India and abroad. 
+Courses available:
+Engineering, Management, Nursing, Pharmacy, Law
 
-VGI is running UG & PG courses in following institutes:- 
-
-Engineering
-Management 
-Nursing 
-Pharmacy
-Law
-
-All courses are approved by UGC, AICTE, PCI, BCI and MPNRC and affiliated to state Govt. Universities.
-
-For various Discount and Scholarship Schemes click on the link below:- 
+Scholarship:
 https://www.vitm.edu.in/scholarship.html
 
-Stay updated and connected by following our official Instagram page: [vikrant.indore]
+Instagram:
 https://www.instagram.com/vikrant.indore
 
-We hope your visit is both enjoyable and inspiring. Feel free to reach out for more details.
+Thanks
+"""
 
-Thanks"""
-    result = send_whatsapp_message(student_number, message)
+            result = send_whatsapp_message(student_number, message)
 
-    if "error" in result:
-        return f"Message not sent: {result['error']}"
-    return f"✅ Message sent to {student_name} ({student_number})!"
+            if "error" in result:
+                st.error("Message failed")
+            else:
+                st.success("Visitor registered & message sent!")
 
-# Bulk Message Page and Logic
-@app.route("/bulk_message", methods=["GET", "POST"])
-def bulk_message():
-    if request.method == "POST":
-        message = request.form.get("message")
-        manual_input = request.form.get("manual_numbers", "")
-        file = request.files.get("file")
+# =====================================================
+# 📤 BULK MESSAGE
+# =====================================================
+elif menu == "Bulk Message":
+
+    st.header("Bulk WhatsApp Sender")
+
+    uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
+    manual_numbers = st.text_area("Or Enter Numbers (comma or line separated)")
+    message = st.text_area("Enter Message")
+
+    if st.button("Send Messages"):
+
         numbers = []
 
-        # Read from Excel file
-        if file and file.filename.endswith(".xlsx"):
-            workbook = openpyxl.load_workbook(file)
-            sheet = workbook.active
-            # Find the "Phone Number" column index
-            header = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
-            try:
-                phone_idx = header.index("Phone Number")
-            except ValueError:
-                return "⚠️ 'Phone Number' column not found in uploaded file."
-            for row in sheet.iter_rows(min_row=2, values_only=True):
-                phone = row[phone_idx]
-                if phone:
-                    numbers.append(str(phone))
+        # Excel Input
+        if uploaded_file:
+            wb = openpyxl.load_workbook(uploaded_file)
+            sheet = wb.active
 
-        # Read from manual input
-        if manual_input.strip():
-            for entry in manual_input.replace(',', '\n').split('\n'):
-                num = entry.strip()
-                if num:
-                    numbers.append(num)
+            header = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
+
+            if "Phone Number" not in header:
+                st.error("'Phone Number' column missing")
+            else:
+                idx = header.index("Phone Number")
+
+                for row in sheet.iter_rows(min_row=2, values_only=True):
+                    if row[idx]:
+                        numbers.append(str(row[idx]))
+
+        # Manual Input
+        if manual_numbers:
+            for num in manual_numbers.replace(',', '\n').split('\n'):
+                if num.strip():
+                    numbers.append(num.strip())
 
         if not numbers:
-            return "⚠️ Please upload a file or enter numbers manually."
+            st.error("No numbers found")
+        else:
+            for number in numbers:
+                send_whatsapp_message(number, message)
 
-        failed = []
-        for number in numbers:
-            result = send_whatsapp_message(number, message)
-            if "error" in result:
-                failed.append(number)
-
-        if failed:
-            return f"❌ Failed for: {', '.join(failed)}"
-        return "✅ Bulk messages sent successfully!"
-
-    return render_template("bulk_message.html")
-
-if __name__ == "__main__":
-    app.run(debug=True)
+            st.success("Bulk messages sent successfully!")
