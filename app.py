@@ -1,171 +1,159 @@
-import streamlit as st
+from flask import Flask, request, render_template
 import requests
 import openpyxl
 import os
 
-# ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="Visitor Management System", layout="wide")
+app = Flask(__name__)
 
-# ---------------- CUSTOM UI ----------------
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background: linear-gradient(to right, #6a11cb, #2575fc);
-    }
-
-    h1 {
-        text-align: center;
-        color: white;
-    }
-
-    .stButton>button {
-        background-color: #6a11cb;
-        color: white;
-        border-radius: 10px;
-        padding: 10px;
-        font-weight: bold;
-    }
-
-    .stButton>button:hover {
-        background-color: #2575fc;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# ---------------- HEADER ----------------
-st.image("https://i.ibb.co/mJ573Hy/vitmlogo.png", width=250)
-st.markdown("<h1>Visitor Management System</h1>", unsafe_allow_html=True)
-
-# ---------------- API CONFIG ----------------
+# UltraMsg API credentials
 INSTANCE_KEY = "instance143653"
-TOKEN = "your_token_here"   # replace with your token
+TOKEN = os.environ.get("8i34klnikkn43e2t")
 API_URL = f"https://api.ultramsg.com/{INSTANCE_KEY}/messages/chat"
 
-# ---------------- EXCEL SETUP ----------------
 EXCEL_FILE = "Student_Data.xlsx"
 
+# Create Excel file if not exists
 if not os.path.exists(EXCEL_FILE):
-    wb = openpyxl.Workbook()
-    sheet = wb.active
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Student Data"
     sheet.append(["Student Name", "Phone Number", "Course Name", "Parent Name", "Parent Contact"])
-    wb.save(EXCEL_FILE)
+    workbook.save(EXCEL_FILE)
 
+# Save to Excel
 def save_to_excel(data):
-    wb = openpyxl.load_workbook(EXCEL_FILE)
-    sheet = wb.active
+    workbook = openpyxl.load_workbook(EXCEL_FILE)
+    sheet = workbook.active
     sheet.append(data)
-    wb.save(EXCEL_FILE)
+    workbook.save(EXCEL_FILE)
 
-# ---------------- WHATSAPP FUNCTION ----------------
+# Send WhatsApp message
 def send_whatsapp_message(phone_number, message):
+    # Delete if you tokens not added
+    if not TOKEN:
+        return {"error": "Token not configured"}
+        
     if not phone_number.startswith("+91"):
         phone_number = "+91" + phone_number.lstrip("0")
-
     payload = {"to": phone_number, "body": message}
-
     try:
         response = requests.post(f"{API_URL}?token={TOKEN}", json=payload)
         return response.json()
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         return {"error": str(e)}
 
-# ---------------- SIDEBAR ----------------
-menu = st.sidebar.selectbox("Menu", ["Visitor Entry", "Bulk Message"])
+# Home Page
+@app.route("/")
+def home():
+    return '''
+    <html>
+    <head><title>Visitor Management System</title></head>
+    <body style="text-align:center; font-family:Arial; background:#f0f4f8; padding-top:50px;">
+        <h1 style="color:#6a11cb;">Visitor Management System</h1>
+        <a href="/visitor_form" style="padding:15px 25px; margin:10px; background:#6a11cb; color:white; border-radius:8px; text-decoration:none;">Individual Visitor Message</a>
+        <a href="/bulk_message" style="padding:15px 25px; margin:10px; background:#6a11cb; color:white; border-radius:8px; text-decoration:none;">Bulk WhatsApp Sender</a>
+    </body>
+    </html>
+    '''
 
-# =====================================================
-# 👤 VISITOR ENTRY
-# =====================================================
-if menu == "Visitor Entry":
+# Visitor Form Page
+@app.route("/visitor_form")
+def visitor_form():
+    return render_template("index.html")
 
-    col1, col2, col3 = st.columns([1,2,1])
+# Handle Individual Form Submission
+@app.route("/send_message", methods=["POST"])
+def send_message():
+    student_name = request.form.get("student_name", "").strip()
+    student_number = request.form.get("student_number", "").strip()
+    course_name = request.form.get("course_name", "").strip()
+    parent_name = request.form.get("parent_name", "").strip()
+    parent_contact = request.form.get("parent_contact", "").strip()
 
-    with col2:
-        st.subheader("👤 Visitor Registration")
+    if not all([student_name, student_number, course_name, parent_name, parent_contact]):
+        return "Error: All fields are required."
 
-        student_name = st.text_input("Student Name")
-        student_number = st.text_input("Student Contact Number")
-        course_name = st.text_input("Course Name")
-        parent_name = st.text_input("Parent Name")
-        parent_contact = st.text_input("Parent Contact Number")
+    save_to_excel([student_name, student_number, course_name, parent_name, parent_contact])
 
-        if st.button("Register Visitor"):
-            if not all([student_name, student_number, course_name, parent_name, parent_contact]):
-                st.error("All fields are required")
-            else:
-                save_to_excel([student_name, student_number, course_name, parent_name, parent_contact])
-
-                message = f"""
+    message = f"""
 Hello {student_name},
 
 Welcome to Vikrant Group Of Institutions, Indore.
 
-Thank you for visiting our campus.
+Thank you very much for visiting the campus.
 
-Courses: Engineering, Management, Nursing, Pharmacy, Law
+Vikrant Group has been into existence since more then 20 years now, with more than 10,000/- Alumni working in India and abroad. 
 
-Scholarship:
+VGI is running UG & PG courses in following institutes:- 
+
+Engineering
+Management 
+Nursing 
+Pharmacy
+Law
+
+All courses are approved by UGC, AICTE, PCI, BCI and MPNRC and affiliated to state Govt. Universities.
+
+For various Discount and Scholarship Schemes click on the link below:- 
 https://www.vitm.edu.in/scholarship.html
 
-Instagram:
+Stay updated and connected by following our official Instagram page: [vikrant.indore]
 https://www.instagram.com/vikrant.indore
 
-Thanks
-"""
+We hope your visit is both enjoyable and inspiring. Feel free to reach out for more details.
 
-                result = send_whatsapp_message(student_number, message)
+Thanks"""
+    result = send_whatsapp_message(student_number, message)
 
-                if "error" in result:
-                    st.error("Message failed")
-                else:
-                    st.success("Visitor Registered Successfully!")
+    if "error" in result:
+        return f"Message not sent: {result['error']}"
+    return f"✅ Message sent to {student_name} ({student_number})!"
 
-# =====================================================
-# 📤 BULK MESSAGE
-# =====================================================
-elif menu == "Bulk Message":
+# Bulk Message Page and Logic
+@app.route("/bulk_message", methods=["GET", "POST"])
+def bulk_message():
+    if request.method == "POST":
+        message = request.form.get("message")
+        manual_input = request.form.get("manual_numbers", "")
+        file = request.files.get("file")
+        numbers = []
 
-    col1, col2, col3 = st.columns([1,2,1])
+        # Read from Excel file
+        if file and file.filename.endswith(".xlsx"):
+            workbook = openpyxl.load_workbook(file)
+            sheet = workbook.active
+            # Find the "Phone Number" column index
+            header = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
+            try:
+                phone_idx = header.index("Phone Number")
+            except ValueError:
+                return "⚠️ 'Phone Number' column not found in uploaded file."
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                phone = row[phone_idx]
+                if phone:
+                    numbers.append(str(phone))
 
-    with col2:
-        st.subheader("📤 Bulk WhatsApp Sender")
+        # Read from manual input
+        if manual_input.strip():
+            for entry in manual_input.replace(',', '\n').split('\n'):
+                num = entry.strip()
+                if num:
+                    numbers.append(num)
 
-        uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
-        manual_numbers = st.text_area("Enter Numbers (comma or line separated)")
-        message = st.text_area("Enter Message")
+        if not numbers:
+            return "⚠️ Please upload a file or enter numbers manually."
 
-        if st.button("Send Messages"):
+        failed = []
+        for number in numbers:
+            result = send_whatsapp_message(number, message)
+            if "error" in result:
+                failed.append(number)
 
-            numbers = []
+        if failed:
+            return f"❌ Failed for: {', '.join(failed)}"
+        return "✅ Bulk messages sent successfully!"
 
-            # Excel input
-            if uploaded_file:
-                wb = openpyxl.load_workbook(uploaded_file)
-                sheet = wb.active
+    return render_template("bulk_message.html")
 
-                header = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
-
-                if "Phone Number" in header:
-                    idx = header.index("Phone Number")
-
-                    for row in sheet.iter_rows(min_row=2, values_only=True):
-                        if row[idx]:
-                            numbers.append(str(row[idx]))
-                else:
-                    st.error("'Phone Number' column not found")
-
-            # Manual input
-            if manual_numbers:
-                for num in manual_numbers.replace(',', '\n').split('\n'):
-                    if num.strip():
-                        numbers.append(num.strip())
-
-            if not numbers:
-                st.error("No numbers found")
-            else:
-                for number in numbers:
-                    send_whatsapp_message(number, message)
-
-                st.success("Bulk Messages Sent Successfully!")
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
