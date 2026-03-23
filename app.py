@@ -1,4 +1,6 @@
-from flask import Flask, request, render_template, redirect
+from flask import Flask, request, render_template, redirect, send_file
+import pandas as pd
+import io
 import requests
 import os
 import logging
@@ -213,6 +215,34 @@ def view_visitors():
     headers, rows = get_all_visitors()
     return render_template("view.html", headers=headers, rows=rows)
 
+# ---------------- DOWNLOAD FILE ----------------
+@app.route("/download")
+def download():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM visitors ORDER BY id DESC")
+    rows = cur.fetchall()
+
+    headers = ["ID", "Student Name", "Phone", "Course", "Parent", "Parent Contact"]
+
+    cur.close()
+    conn.close()
+
+    # Convert to DataFrame
+    df = pd.DataFrame(rows, columns=headers)
+
+    # Save to Excel in memory
+    output = io.BytesIO()
+    df.to_excel(output, index=False)
+    output.seek(0)
+
+    return send_file(
+        output,
+        download_name="visitors.xlsx",
+        as_attachment=True,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 # ---------------- ERROR ----------------
 @app.errorhandler(404)
 def not_found(e):
