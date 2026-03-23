@@ -1,18 +1,23 @@
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, redirect
 import requests
 import openpyxl
 import os
+import logging
 
 app = Flask(__name__)
 
-# UltraMsg API credentials
+# ---------------- LOGGING ----------------
+logging.basicConfig(level=logging.INFO)
+
+# ---------------- API CONFIG ----------------
 INSTANCE_KEY = "instance143653"
-TOKEN = os.environ.get("8i34klnikkn43e2t")
+TOKEN = os.environ.get("TOKEN")   # FIXED
 API_URL = f"https://api.ultramsg.com/{INSTANCE_KEY}/messages/chat"
 
+# ---------------- EXCEL FILE ----------------
 EXCEL_FILE = "Student_Data.xlsx"
 
-# Create Excel file if not exists
+# Create file if not exists
 if not os.path.exists(EXCEL_FILE):
     workbook = openpyxl.Workbook()
     sheet = workbook.active
@@ -20,48 +25,50 @@ if not os.path.exists(EXCEL_FILE):
     sheet.append(["Student Name", "Phone Number", "Course Name", "Parent Name", "Parent Contact"])
     workbook.save(EXCEL_FILE)
 
-# Save to Excel
+# ---------------- SAVE FUNCTION ----------------
 def save_to_excel(data):
     workbook = openpyxl.load_workbook(EXCEL_FILE)
     sheet = workbook.active
     sheet.append(data)
     workbook.save(EXCEL_FILE)
 
-# Send WhatsApp message
+# ---------------- CHECK DUPLICATE ----------------
+def is_duplicate(phone):
+    workbook = openpyxl.load_workbook(EXCEL_FILE)
+    sheet = workbook.active
+
+    for row in sheet.iter_rows(min_row=2, values_only=True):
+        if row[1] == phone:
+            return True
+    return False
+
+# ---------------- WHATSAPP FUNCTION ----------------
 def send_whatsapp_message(phone_number, message):
-    # Delete if you tokens not added
     if not TOKEN:
         return {"error": "Token not configured"}
-        
+
     if not phone_number.startswith("+91"):
         phone_number = "+91" + phone_number.lstrip("0")
+
     payload = {"to": phone_number, "body": message}
+
     try:
-        response = requests.post(f"{API_URL}?token={TOKEN}", json=payload)
+        response = requests.post(f"{API_URL}?token={TOKEN}", json=payload, timeout=10)
         return response.json()
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         return {"error": str(e)}
 
-# Home Page
+# ---------------- HOME ----------------
 @app.route("/")
 def home():
-    return '''
-    <html>
-    <head><title>Visitor Management System</title></head>
-    <body style="text-align:center; font-family:Arial; background:#f0f4f8; padding-top:50px;">
-        <h1 style="color:#6a11cb;">Visitor Management System</h1>
-        <a href="/visitor_form" style="padding:15px 25px; margin:10px; background:#6a11cb; color:white; border-radius:8px; text-decoration:none;">Individual Visitor Message</a>
-        <a href="/bulk_message" style="padding:15px 25px; margin:10px; background:#6a11cb; color:white; border-radius:8px; text-decoration:none;">Bulk WhatsApp Sender</a>
-    </body>
-    </html>
-    '''
+    return render_template("home.html")
 
-# Visitor Form Page
+# ---------------- VISITOR FORM ----------------
 @app.route("/visitor_form")
 def visitor_form():
     return render_template("index.html")
 
-# Handle Individual Form Submission
+# ---------------- SEND MESSAGE ----------------
 @app.route("/send_message", methods=["POST"])
 def send_message():
     student_name = request.form.get("student_name", "").strip()
@@ -70,80 +77,83 @@ def send_message():
     parent_name = request.form.get("parent_name", "").strip()
     parent_contact = request.form.get("parent_contact", "").strip()
 
+    # Validation
     if not all([student_name, student_number, course_name, parent_name, parent_contact]):
-        return "Error: All fields are required."
+        return "❌ All fields are required."
 
+    if len(student_number) < 10:
+        return "❌ Invalid phone number."
+
+    if is_duplicate(student_number):
+        return "⚠️ Visitor already exists."
+
+    # Save
     save_to_excel([student_name, student_number, course_name, parent_name, parent_contact])
+    logging.info(f"New visitor added: {student_name}")
 
+    # Message
     message = f"""
 Hello {student_name},
 
 Welcome to Vikrant Group Of Institutions, Indore.
 
-Thank you very much for visiting the campus.
+Thank you for visiting our campus.
 
-Vikrant Group has been into existence since more then 20 years now, with more than 10,000/- Alumni working in India and abroad. 
+Courses: Engineering, Management, Nursing, Pharmacy, Law
 
-VGI is running UG & PG courses in following institutes:- 
-
-Engineering
-Management 
-Nursing 
-Pharmacy
-Law
-
-All courses are approved by UGC, AICTE, PCI, BCI and MPNRC and affiliated to state Govt. Universities.
-
-For various Discount and Scholarship Schemes click on the link below:- 
+Scholarship:
 https://www.vitm.edu.in/scholarship.html
 
-Stay updated and connected by following our official Instagram page: [vikrant.indore]
+Instagram:
 https://www.instagram.com/vikrant.indore
 
-We hope your visit is both enjoyable and inspiring. Feel free to reach out for more details.
+Thanks
+"""
 
-Thanks"""
     result = send_whatsapp_message(student_number, message)
 
     if "error" in result:
-        return f"Message not sent: {result['error']}"
-    return f"✅ Message sent to {student_name} ({student_number})!"
+        return f"⚠️ Saved but message failed: {result['error']}"
 
-# Bulk Message Page and Logic
+    return redirect("/visitor_form?success=1")
+
+# ---------------- BULK MESSAGE ----------------
 @app.route("/bulk_message", methods=["GET", "POST"])
 def bulk_message():
     if request.method == "POST":
         message = request.form.get("message")
         manual_input = request.form.get("manual_numbers", "")
         file = request.files.get("file")
+
         numbers = []
 
-        # Read from Excel file
+        # Excel input
         if file and file.filename.endswith(".xlsx"):
             workbook = openpyxl.load_workbook(file)
             sheet = workbook.active
-            # Find the "Phone Number" column index
-            header = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
-            try:
-                phone_idx = header.index("Phone Number")
-            except ValueError:
-                return "⚠️ 'Phone Number' column not found in uploaded file."
-            for row in sheet.iter_rows(min_row=2, values_only=True):
-                phone = row[phone_idx]
-                if phone:
-                    numbers.append(str(phone))
 
-        # Read from manual input
+            header = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
+
+            if "Phone Number" not in header:
+                return "⚠️ 'Phone Number' column not found."
+
+            idx = header.index("Phone Number")
+
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                if row[idx]:
+                    numbers.append(str(row[idx]))
+
+        # Manual input
         if manual_input.strip():
-            for entry in manual_input.replace(',', '\n').split('\n'):
-                num = entry.strip()
-                if num:
-                    numbers.append(num)
+            for num in manual_input.replace(',', '\n').split('\n'):
+                if num.strip():
+                    numbers.append(num.strip())
 
         if not numbers:
-            return "⚠️ Please upload a file or enter numbers manually."
+            return "⚠️ No numbers found."
 
         failed = []
+
         for number in numbers:
             result = send_whatsapp_message(number, message)
             if "error" in result:
@@ -151,9 +161,36 @@ def bulk_message():
 
         if failed:
             return f"❌ Failed for: {', '.join(failed)}"
+
         return "✅ Bulk messages sent successfully!"
 
     return render_template("bulk_message.html")
 
+# ---------------- DASHBOARD ----------------
+@app.route("/dashboard")
+def dashboard():
+    workbook = openpyxl.load_workbook(EXCEL_FILE)
+    sheet = workbook.active
+    total = sheet.max_row - 1
+    return render_template("dashboard.html", total=total)
+
+# ---------------- VIEW VISITORS ----------------
+@app.route("/view_visitors")
+def view_visitors():
+    workbook = openpyxl.load_workbook(EXCEL_FILE)
+    sheet = workbook.active
+
+    data = list(sheet.values)
+    headers = data[0]
+    rows = data[1:]
+
+    return render_template("view.html", headers=headers, rows=rows)
+
+# ---------------- ERROR ----------------
+@app.errorhandler(404)
+def not_found(e):
+    return "<h1>Page Not Found</h1>", 404
+
+# ---------------- RUN ----------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=10000)  
