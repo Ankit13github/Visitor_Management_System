@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Visitors</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #eef2ff, #f8f9ff);
+        }
+
+        .card {
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .table thead {
+            background-color: #6a11cb;
+            color: white;
+        }
+
+        .table tbody tr:hover {
+            background-color: #f1f3ff;
+            transition: 0.2s;
+        }
+
+        .title {
+            font-weight: 600;
+        }
+
+        .search-box {
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container mt-5">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="title">👥 Visitor Records</h2>
+
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+            ⬅ Back
+        </a>
+    </div>
+
+    <!-- Search -->
+    <div class="mb-3">
+        <input type="text" id="searchInput" class="form-control search-box" placeholder="🔍 Search visitors...">
+    </div>
+
+    <!-- Table Card -->
+    <div class="card">
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle text-center" id="visitorTable">
+
+                <thead>
+                    <tr>
+                        {% for h in headers %}
+                        <th>{{ h }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        {% for cell in row %}
+                        <td>{{ cell }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Search Script -->
+<script>
+document.getElementById("searchInput").addEventListener("keyup", function() {
+    let filter = this.value.toLowerCase();
+    let rows = document.querySelectorAll("#visitorTable tbody tr");
+
+    rows.forEach(row => {
+        let text = row.innerText.toLowerCase();
+        row.style.display = text.includes(filter) ? "" : "none";
+    });
+});
+</script>
+
+</body>
+</html>
