@@ -1,46 +1,101 @@
 from flask import Flask, request, render_template, redirect
 import requests
-import openpyxl
 import os
 import logging
+import psycopg2
 
 app = Flask(__name__)
 
 # ---------------- LOGGING ----------------
 logging.basicConfig(level=logging.INFO)
 
-# ---------------- API CONFIG ----------------
-INSTANCE_KEY = "instance143653"
-TOKEN = os.environ.get("TOKEN")   # FIXED
-API_URL = f"https://api.ultramsg.com/{INSTANCE_KEY}/messages/chat"
+# ---------------- DATABASE ----------------
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# ---------------- EXCEL FILE ----------------
-EXCEL_FILE = "Student_Data.xlsx"
+def get_connection():
+    return psycopg2.connect(DATABASE_URL)
 
-# Create file if not exists
-if not os.path.exists(EXCEL_FILE):
-    workbook = openpyxl.Workbook()
-    sheet = workbook.active
-    sheet.title = "Student Data"
-    sheet.append(["Student Name", "Phone Number", "Course Name", "Parent Name", "Parent Contact"])
-    workbook.save(EXCEL_FILE)
+# Create table
+def create_table():
+    conn = get_connection()
+    cur = conn.cursor()
 
-# ---------------- SAVE FUNCTION ----------------
-def save_to_excel(data):
-    workbook = openpyxl.load_workbook(EXCEL_FILE)
-    sheet = workbook.active
-    sheet.append(data)
-    workbook.save(EXCEL_FILE)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS visitors (
+        id SERIAL PRIMARY KEY,
+        student_name TEXT,
+        student_number TEXT,
+        course_name TEXT,
+        parent_name TEXT,
+        parent_contact TEXT
+    );
+    """)
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+create_table()
+
+# ---------------- SAVE TO DB ----------------
+def save_to_db(data):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT INTO visitors 
+    (student_name, student_number, course_name, parent_name, parent_contact)
+    VALUES (%s, %s, %s, %s, %s)
+    """, data)
+
+    conn.commit()
+    cur.close()
+    conn.close()
 
 # ---------------- CHECK DUPLICATE ----------------
 def is_duplicate(phone):
-    workbook = openpyxl.load_workbook(EXCEL_FILE)
-    sheet = workbook.active
+    conn = get_connection()
+    cur = conn.cursor()
 
-    for row in sheet.iter_rows(min_row=2, values_only=True):
-        if row[1] == phone:
-            return True
-    return False
+    cur.execute("SELECT * FROM visitors WHERE student_number = %s", (phone,))
+    result = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    return result is not None
+
+# ---------------- GET TOTAL ----------------
+def get_total():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT COUNT(*) FROM visitors")
+    total = cur.fetchone()[0]
+
+    cur.close()
+    conn.close()
+    return total
+
+# ---------------- GET ALL VISITORS ----------------
+def get_all_visitors():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM visitors ORDER BY id DESC")
+    rows = cur.fetchall()
+
+    headers = ["ID", "Student Name", "Phone", "Course", "Parent", "Parent Contact"]
+
+    cur.close()
+    conn.close()
+
+    return headers, rows
+
+# ---------------- API CONFIG ----------------
+INSTANCE_KEY = "instance143653"
+TOKEN = os.environ.get("TOKEN")
+API_URL = f"https://api.ultramsg.com/{INSTANCE_KEY}/messages/chat"
 
 # ---------------- WHATSAPP FUNCTION ----------------
 def send_whatsapp_message(phone_number, message):
@@ -77,7 +132,6 @@ def send_message():
     parent_name = request.form.get("parent_name", "").strip()
     parent_contact = request.form.get("parent_contact", "").strip()
 
-    # Validation
     if not all([student_name, student_number, course_name, parent_name, parent_contact]):
         return "❌ All fields are required."
 
@@ -87,11 +141,10 @@ def send_message():
     if is_duplicate(student_number):
         return "⚠️ Visitor already exists."
 
-    # Save
-    save_to_excel([student_name, student_number, course_name, parent_name, parent_contact])
+    # Save to DB
+    save_to_db([student_name, student_number, course_name, parent_name, parent_contact])
     logging.info(f"New visitor added: {student_name}")
 
-    # Message
     message = f"""
 Hello {student_name},
 
@@ -123,27 +176,9 @@ def bulk_message():
     if request.method == "POST":
         message = request.form.get("message")
         manual_input = request.form.get("manual_numbers", "")
-        file = request.files.get("file")
 
         numbers = []
 
-        # Excel input
-        if file and file.filename.endswith(".xlsx"):
-            workbook = openpyxl.load_workbook(file)
-            sheet = workbook.active
-
-            header = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
-
-            if "Phone Number" not in header:
-                return "⚠️ 'Phone Number' column not found."
-
-            idx = header.index("Phone Number")
-
-            for row in sheet.iter_rows(min_row=2, values_only=True):
-                if row[idx]:
-                    numbers.append(str(row[idx]))
-
-        # Manual input
         if manual_input.strip():
             for num in manual_input.replace(',', '\n').split('\n'):
                 if num.strip():
@@ -169,21 +204,13 @@ def bulk_message():
 # ---------------- DASHBOARD ----------------
 @app.route("/dashboard")
 def dashboard():
-    workbook = openpyxl.load_workbook(EXCEL_FILE)
-    sheet = workbook.active
-    total = sheet.max_row - 1
+    total = get_total()
     return render_template("dashboard.html", total=total)
 
 # ---------------- VIEW VISITORS ----------------
 @app.route("/view_visitors")
 def view_visitors():
-    workbook = openpyxl.load_workbook(EXCEL_FILE)
-    sheet = workbook.active
-
-    data = list(sheet.values)
-    headers = data[0]
-    rows = data[1:]
-
+    headers, rows = get_all_visitors()
     return render_template("view.html", headers=headers, rows=rows)
 
 # ---------------- ERROR ----------------
@@ -193,4 +220,4 @@ def not_found(e):
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)  
+    app.run(host="0.0.0.0", port=10000)
