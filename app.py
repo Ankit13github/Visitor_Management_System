@@ -1,5 +1,5 @@
 
-from flask import Flask, request, render_template, redirect, send_file
+from flask import Flask, request, render_template, redirect, send_file, session, redirect, url_for
 import pandas as pd
 import io
 import requests
@@ -100,6 +100,9 @@ INSTANCE_KEY = "instance143653"
 TOKEN = os.environ.get("TOKEN")
 API_URL = f"https://api.ultramsg.com/{INSTANCE_KEY}/messages/chat"
 
+# ---------------- Admin Login ----------------
+app.secret_key = "super_secret_key_123"
+
 # ---------------- WHATSAPP FUNCTION ----------------
 def send_whatsapp_message(phone_number, message):
     if not TOKEN:
@@ -176,6 +179,9 @@ Thanks
 # ---------------- BULK MESSAGE ----------------
 @app.route("/bulk_message", methods=["GET", "POST"])
 def bulk_message():
+    if not session.get("admin"):
+        return redirect("/login")
+        
     if request.method == "POST":
         message = request.form.get("message")
         manual_input = request.form.get("manual_numbers", "")
@@ -207,13 +213,20 @@ def bulk_message():
 # ---------------- DASHBOARD ----------------
 @app.route("/dashboard")
 def dashboard():
+    if not session.get("admin"):
+        return redirect("/login")
+        
     total = get_total()
     return render_template("dashboard.html", total=total)
 
 # ---------------- VIEW VISITORS ----------------
 @app.route("/view_visitors")
 def view_visitors():
-    headers, rows = get_all_visitors()
+    if not session.get("admin"):
+        return redirect("/login")
+
+    filter_type = request.args.get("filter")
+    headers, rows = get_all_visitors(filter_type)
     return render_template("view.html", headers=headers, rows=rows)
 
 # ---------------- DOWNLOAD FILE ----------------
@@ -247,6 +260,8 @@ def download():
 # ---------------- DELETE VISITOR FUNCTION ----------------
 @app.route("/delete/<int:id>")
 def delete_visitor(id):
+    if not session.get("admin"):
+        return redirect("/login")
     conn = get_connection()
     cur = conn.cursor()
 
@@ -261,6 +276,9 @@ def delete_visitor(id):
 # ---------------- EDIT VISITOR  ----------------
 @app.route("/edit/<int:id>", methods=["GET", "POST"])
 def edit_visitor(id):
+    if not session.get("admin"):
+        return redirect("/login")
+    
     conn = get_connection()
     cur = conn.cursor()
 
@@ -292,6 +310,27 @@ def edit_visitor(id):
     conn.close()
 
     return render_template("edit.html", visitor=visitor)
+
+# ---------------- Login Method----------------
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        if username == "admin" and password == "1234":
+            session["admin"] = True
+            return redirect("/dashboard")
+        else:
+            return "❌ Invalid credentials"
+
+    return render_template("login.html")
+
+# ---------------- Logout Config ----------------
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
 
 # ---------------- ERROR ----------------
 @app.errorhandler(404)
