@@ -81,11 +81,27 @@ def get_total():
     return total
 
 # ---------------- GET ALL VISITORS ----------------
-def get_all_visitors():
+def get_all_visitors(filter_type=None):
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM visitors ORDER BY id DESC")
+    if filter_type == "today":
+        cur.execute("""
+        SELECT * FROM visitors 
+        WHERE DATE(created_at) = CURRENT_DATE
+        ORDER BY id DESC
+        """)
+
+    elif filter_type == "week":
+        cur.execute("""
+        SELECT * FROM visitors 
+        WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+        ORDER BY id DESC
+        """)
+
+    else:
+        cur.execute("SELECT * FROM visitors ORDER BY id DESC")
+        
     rows = cur.fetchall()
 
     headers = ["ID", "Student Name", "Phone", "Course", "Parent", "Parent Contact"]
