@@ -111,19 +111,26 @@
 
                 <thead>
                     <tr>
-                        {% for h in headers %}
-                        <th>{{ h }}</th>
-                        {% endfor %}
+                        <th>#</th>
+                        <th>Student Name</th>
+                        <th>Phone</th>
+                        <th>Course</th>
+                        <th>Parent</th>
+                        <th>Parent Contact</th>
                         <th>Action</th>
                     </tr>
                 </thead>
 
                 <tbody>
-                    {% for row in rows %}
+                  {% for row in rows %}
                     <tr>
-                        {% for cell in row %}
-                        <td>{{ cell }}</td>
-                        {% endfor %}
+                        <td>{{ loop.index }}</td>  <!-- Serial Number -->
+                    
+                        <td>{{ row[1] }}</td>
+                        <td>{{ row[2] }}</td>
+                        <td>{{ row[3] }}</td>
+                        <td>{{ row[4] }}</td>
+                        <td>{{ row[5] }}</td>
 
                         <td class="action-btns">
                             
