@@ -56,13 +56,24 @@
 <div class="card text-center" style="width: 350px;">
     <h1>Visitor System</h1>
 
-    <a href="{{ url_for('visitor_form') }}" class="btn btn-primary btn-custom">➕ Add Visitor</a>
+    {% if session.get("admin") %}
 
-    <a href="{{ url_for('bulk_message') }}" class="btn btn-success btn-custom">📩 Bulk Message</a>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-warning btn-custom">📊 Dashboard</a>
 
-    <a href="{{ url_for('dashboard') }}" class="btn btn-warning btn-custom">📊 Dashboard</a>
+        <a href="{{ url_for('view_visitors') }}" class="btn btn-dark btn-custom">👥 View Visitors</a>
 
-    <a href="{{ url_for('view_visitors') }}" class="btn btn-dark btn-custom">👥 View Visitors</a>
+        <a href="{{ url_for('bulk_message') }}" class="btn btn-success btn-custom">📩 Bulk Message</a>
+
+        <a href="{{ url_for('logout') }}" class="btn btn-danger btn-custom">🚪 Logout</a>
+
+    {% else %}
+
+        <a href="{{ url_for('visitor_form') }}" class="btn btn-primary btn-custom">➕ Fill Visitor Form</a>
+
+        <a href="{{ url_for('login') }}" class="btn btn-secondary btn-custom">🔐 Admin Login</a>
+
+    {% endif %}
+
 </div>
 
 </body>
