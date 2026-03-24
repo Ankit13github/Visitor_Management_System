@@ -1,3 +1,4 @@
+
 from flask import Flask, request, render_template, redirect, send_file
 import pandas as pd
 import io
@@ -243,6 +244,55 @@ def download():
         as_attachment=True,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+# ---------------- DELETE VISITOR FUNCTION ----------------
+@app.route("/delete/<int:id>")
+def delete_visitor(id):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM visitors WHERE id = %s", (id,))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return redirect("/view_visitors")
+
+# ---------------- EDIT VISITOR  ----------------
+@app.route("/edit/<int:id>", methods=["GET", "POST"])
+def edit_visitor(id):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    if request.method == "POST":
+        student_name = request.form.get("student_name")
+        student_number = request.form.get("student_number")
+        course_name = request.form.get("course_name")
+        parent_name = request.form.get("parent_name")
+        parent_contact = request.form.get("parent_contact")
+
+        cur.execute("""
+        UPDATE visitors
+        SET student_name=%s, student_number=%s, course_name=%s,
+            parent_name=%s, parent_contact=%s
+        WHERE id=%s
+        """, (student_name, student_number, course_name, parent_name, parent_contact, id))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return redirect("/view_visitors")
+
+    # GET request (load data)
+    cur.execute("SELECT * FROM visitors WHERE id = %s", (id,))
+    visitor = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    return render_template("edit.html", visitor=visitor)
+
 # ---------------- ERROR ----------------
 @app.errorhandler(404)
 def not_found(e):
