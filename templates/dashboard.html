@@ -32,7 +32,7 @@
         }
 
         .count {
-            font-size: 48px;
+            font-size: 40px;
             font-weight: bold;
             color: #6a11cb;
         }
@@ -43,7 +43,7 @@
             font-size: 16px;
         }
 
-         @media (max-width: 768px) {
+        @media (max-width: 768px) {
             h1, h2, h3 {
                 font-size: 22px;
             }
@@ -65,47 +65,67 @@
 <div class="container mt-5">
 
     <!-- Header -->
-    <div class="text-center mb-5">
-        <h2 class="title">📊 Visitor Dashboard</h2>
-        <p class="text-muted">Overview of your visitor system</p>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="title">📊 Visitor Dashboard</h2>
+            <p class="text-muted mb-0">Overview of your visitor system</p>
+        </div>
+
+        <a href="{{ url_for('logout') }}" class="btn btn-danger">
+            🚪 Logout
+        </a>
     </div>
 
-    <!-- Stats Card -->
-    <div class="row justify-content-center">
-        <div class="col-md-5">
+    <!-- Stats Cards -->
+    <div class="row g-4">
+
+        <!-- Total Visitors -->
+        <div class="col-md-6">
             <div class="card card-custom text-center">
                 <i class="bi bi-people-fill fs-1 text-primary mb-3"></i>
                 <h5>Total Visitors</h5>
-                <div class="count">{{ total }}</div>
+                <div class="count text-primary">{{ total }}</div>
             </div>
         </div>
+
+        <!-- Today's Visitors (placeholder for now) -->
+        <div class="col-md-6">
+            <div class="card card-custom text-center">
+                <i class="bi bi-calendar-check fs-1 text-success mb-3"></i>
+                <h5>Today's Visitors</h5>
+                <div class="count text-success">{{ total }}</div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Action Buttons -->
     <div class="row text-center mt-5">
-        <div class="col-md-3 mb-3">
+
+        <div class="col-md-3 col-6 mb-3">
             <a href="{{ url_for('visitor_form') }}" class="btn btn-primary w-100 nav-btn">
                 ➕ Add Visitor
             </a>
         </div>
 
-        <div class="col-md-3 mb-3">
-            <a href="{{ url_for('bulk_message') }}" class="btn btn-success w-100 nav-btn">
-                📩 Bulk Message
-            </a>
-        </div>
-
-        <div class="col-md-3 mb-3">
+        <div class="col-md-3 col-6 mb-3">
             <a href="{{ url_for('view_visitors') }}" class="btn btn-dark w-100 nav-btn">
                 👥 View Visitors
             </a>
         </div>
 
-        <div class="col-md-3 mb-3">
+        <div class="col-md-3 col-6 mb-3">
+            <a href="{{ url_for('bulk_message') }}" class="btn btn-success w-100 nav-btn">
+                📩 Bulk Message
+            </a>
+        </div>
+
+        <div class="col-md-3 col-6 mb-3">
             <a href="{{ url_for('home') }}" class="btn btn-secondary w-100 nav-btn">
                 ⬅ Back Home
             </a>
         </div>
+
     </div>
 
 </div>
