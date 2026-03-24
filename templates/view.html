@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Visitors</title>
 
     <!-- Bootstrap -->
@@ -34,8 +36,23 @@
             font-weight: 600;
         }
 
-        .search-box {
-            border-radius: 10px;
+        .action-btns a {
+            margin: 2px;
+        }
+
+        @media (max-width: 768px) {
+            h1, h2, h3 {
+                font-size: 22px;
+            }
+
+            .btn {
+                font-size: 16px;
+                padding: 10px;
+            }
+
+            input, select {
+                font-size: 16px;
+            }
         }
     </style>
 </head>
@@ -59,12 +76,34 @@
         </div>
     </div>
 
-    <!-- Search -->
-    <div class="mb-3">
-        <input type="text" id="searchInput" class="form-control search-box" placeholder="🔍 Search visitors...">
+    <!-- Filters -->
+    <div class="row g-2 mb-3">
+
+        <!-- Search by Name -->
+        <div class="col-12 col-md-4">
+            <input type="text" id="nameSearch" class="form-control" placeholder="🔍 Search by Name">
+        </div>
+
+        <!-- Filter by Course (Dropdown) -->
+        <div class="col-12 col-md-4">
+            <select id="courseSearch" class="form-select">
+                <option value="">🎓 All Courses</option>
+                <option value="Engineering">Engineering</option>
+                <option value="Management">Management</option>
+                <option value="Nursing">Nursing</option>
+                <option value="Pharmacy">Pharmacy</option>
+                <option value="Law">Law</option>
+            </select>
+        </div>
+
+        <!-- Reset -->
+        <div class="col-12 col-md-4">
+            <button class="btn btn-secondary w-100" onclick="resetFilters()">Reset</button>
+        </div>
+
     </div>
 
-    <!-- Table Card -->
+    <!-- Table -->
     <div class="card">
 
         <div class="table-responsive">
@@ -75,6 +114,7 @@
                         {% for h in headers %}
                         <th>{{ h }}</th>
                         {% endfor %}
+                        <th>Action</th>
                     </tr>
                 </thead>
 
@@ -84,6 +124,23 @@
                         {% for cell in row %}
                         <td>{{ cell }}</td>
                         {% endfor %}
+
+                        <td class="action-btns">
+                            
+                            <!-- Edit -->
+                            <a href="{{ url_for('edit_visitor', id=row[0]) }}" 
+                               class="btn btn-warning btn-sm">
+                               <i class="bi bi-pencil-square"></i>
+                            </a>
+
+                            <!-- Delete -->
+                            <a href="{{ url_for('delete_visitor', id=row[0]) }}"
+                               class="btn btn-danger btn-sm"
+                               onclick="return confirm('Are you sure you want to delete this record?')">
+                               <i class="bi bi-trash"></i>
+                            </a>
+
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -95,17 +152,36 @@
 
 </div>
 
-<!-- Search Script -->
+<!-- Filter Script -->
 <script>
-document.getElementById("searchInput").addEventListener("keyup", function() {
-    let filter = this.value.toLowerCase();
+const nameInput = document.getElementById("nameSearch");
+const courseInput = document.getElementById("courseSearch");
+
+nameInput.addEventListener("keyup", filterTable);
+courseInput.addEventListener("change", filterTable);
+
+function filterTable() {
+    let nameFilter = nameInput.value.toLowerCase();
+    let courseFilter = courseInput.value.toLowerCase();
+
     let rows = document.querySelectorAll("#visitorTable tbody tr");
 
     rows.forEach(row => {
-        let text = row.innerText.toLowerCase();
-        row.style.display = text.includes(filter) ? "" : "none";
+        let name = row.cells[1].innerText.toLowerCase();
+        let course = row.cells[3].innerText.toLowerCase();
+
+        let matchName = name.includes(nameFilter);
+        let matchCourse = courseFilter === "" || course.includes(courseFilter);
+
+        row.style.display = (matchName && matchCourse) ? "" : "none";
     });
-});
+}
+
+function resetFilters() {
+    nameInput.value = "";
+    courseInput.value = "";
+    filterTable();
+}
 </script>
 
 </body>
