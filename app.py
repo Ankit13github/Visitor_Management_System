@@ -157,11 +157,11 @@ def send_message():
     if not all([student_name, student_number, course_name, parent_name, parent_contact]):
         return "❌ All fields are required."
 
-    if len(student_number) < 10:
-        return "❌ Invalid phone number."
+    if not student_number.isdigit() or len(student_number) != 10:
+    return "❌ Invalid phone number. Must be 10 digits."
 
     if is_duplicate(student_number):
-        return "⚠️ Visitor already exists."
+        return "⚠️ This phone number is already registered."
 
     # Save to DB
     save_to_db([student_name, student_number, course_name, parent_name, parent_contact])
