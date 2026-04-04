@@ -201,9 +201,27 @@ def bulk_message():
     if request.method == "POST":
         message = request.form.get("message")
         manual_input = request.form.get("manual_numbers", "")
+        file = request.files.get("file")   
 
         numbers = []
+        
+        if file and file.filename.endswith(".xlsx"):
+            import openpyxl
 
+            workbook = openpyxl.load_workbook(file)
+            sheet = workbook.active
+
+            header = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
+
+            if "Phone " not in header:
+                return "⚠️ 'Phone Number' column not found in Excel."
+
+            idx = header.index("Phone ")
+
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                if row[idx]:
+                    numbers.append(str(row[idx]))
+                
         if manual_input.strip():
             for num in manual_input.replace(',', '\n').split('\n'):
                 if num.strip():
