@@ -113,7 +113,7 @@ def get_all_visitors(filter_type=None):
 
 # ---------------- API CONFIG ----------------
 INSTANCE_KEY = "instance143653"
-TOKEN = os.environ.get("8i34klnikkn43e2t")
+TOKEN = "8i34klnikkn43e2t"
 API_URL = f"https://api.ultramsg.com/{INSTANCE_KEY}/messages/chat"
 
 # ---------------- Admin Login ----------------
