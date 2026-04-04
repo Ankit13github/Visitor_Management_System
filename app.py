@@ -218,7 +218,7 @@ def bulk_message():
 
             idx = header.index("Phone ")
 
-            for row in sheet.iter_rows(min_row=2, values_only=True):
+            for row in sheet.iter_rows(min_row=3, values_only=True):
                 if row[idx]:
                     numbers.append(str(row[idx]))
                 
