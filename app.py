@@ -158,7 +158,7 @@ def send_message():
         return "❌ All fields are required."
 
     if not student_number.isdigit() or len(student_number) != 10:
-    return "❌ Invalid phone number. Must be 10 digits."
+        return "❌ Invalid phone number. Must be 10 digits."
 
     if is_duplicate(student_number):
         return "⚠️ This phone number is already registered."
